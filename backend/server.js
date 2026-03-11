@@ -7,11 +7,13 @@ const app = express();
 const authRoutes = require("./routes/authRoutes");
 const userRoutes = require("./routes/userRoutes");
 const meetingRoutes = require("./routes/meetingRoutes");
+const taskRoutes = require("./routes/taskRoutes");
 app.use(cors());
 app.use(express.json());
 app.use("/api/auth", authRoutes);
 app.use("/api/user", userRoutes);
 app.use("/api/meetings", meetingRoutes);
+app.use("/api/tasks", taskRoutes);
 app.get("/", (req, res) => {
   res.send("AI Meeting Tracker API Running");
 });
