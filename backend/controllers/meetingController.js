@@ -1,6 +1,6 @@
-const { generateSummary } = require("../services/aiService");
+const { generateSummary, extractTasks } = require("../services/aiService");
 const Meeting = require("../models/Meeting");
-
+const Task = require("../models/Task");
 exports.createMeeting = async (req, res) => {
   try {
 
@@ -15,10 +15,28 @@ exports.createMeeting = async (req, res) => {
     });
 
     await meeting.save();
+    const tasksAI = await extractTasks(transcript);
+       let tasks = [];
+
+    try {
+      tasks = JSON.parse(tasksAI);
+    } catch (error) {
+      tasks = [];
+    }
+
+    for (const t of tasks) {
+      await Task.create({
+        meetingId: meeting._id,
+        task: t.task,
+        owner: t.owner,
+        deadline: t.deadline
+      });
+    }
 
     res.status(201).json({
       message: "Meeting created with AI summary",
-      meeting
+      meeting,
+      tasks
     });
 
   } catch (error) {
