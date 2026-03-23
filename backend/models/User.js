@@ -14,7 +14,25 @@ const UserSchema = new mongoose.Schema({
 
   password: {
     type: String,
-    required: true
+    required: function() {
+      return !this.googleId;
+    }
+  },
+
+  googleId: {
+    type: String,
+    sparse: true
+  },
+
+  organization: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "Organization"
+  },
+
+  role: {
+    type: String,
+    enum: ["admin", "manager", "member"],
+    default: "member"
   },
 
   createdAt: {

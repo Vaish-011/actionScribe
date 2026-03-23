@@ -6,12 +6,13 @@ function CreateMeeting({ refresh }) {
 
   const [title, setTitle] = useState("");
   const [transcript, setTranscript] = useState("");
+  const [file, setFile] = useState(null);
   const [loading, setLoading] = useState(false);
 
   const submitMeeting = async () => {
 
-    if (!title || !transcript) {
-      toast.error("Please fill all fields");
+    if ((!title || !transcript) && !file) {
+      toast.error("Provide transcript details or upload a file");
       return;
     }
 
@@ -19,15 +20,25 @@ function CreateMeeting({ refresh }) {
 
       setLoading(true);
 
-      await API.post("/meetings/create", {
-        title,
-        transcript
-      });
+      if (file) {
+        const formData = new FormData();
+        formData.append("title", title || file.name);
+        formData.append("file", file);
+        await API.post("/meetings/upload", formData, {
+          headers: { "Content-Type": "multipart/form-data" }
+        });
+      } else {
+        await API.post("/meetings/create", {
+          title,
+          transcript
+        });
+      }
 
       toast.success("AI summary generated successfully!");
 
       setTitle("");
       setTranscript("");
+      setFile(null);
 
       refresh();
 
@@ -70,12 +81,20 @@ function CreateMeeting({ refresh }) {
         onChange={(e) => setTranscript(e.target.value)}
       />
 
+      <div className="text-sm text-gray-600 dark:text-gray-300 mb-2">or upload transcript/audio</div>
+      <input
+        type="file"
+        className="w-full mb-3 text-sm"
+        accept=".txt,.pdf,.docx,.mp3,.wav"
+        onChange={(e) => setFile(e.target.files?.[0] || null)}
+      />
+
       <button
         className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded w-full"
         onClick={submitMeeting}
         disabled={loading}
       >
-        {loading ? "Generating AI Summary..." : "Generate AI Summary"}
+        {loading ? "Processing Meeting..." : "Process Meeting"}
       </button>
 
     </div>

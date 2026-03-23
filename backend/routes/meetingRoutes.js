@@ -6,12 +6,15 @@ const authMiddleware = require("../middleware/authMiddleware");
 const {
   createMeeting,
   getMeetings,
-  getMeetingById
+  getMeetingById,
+  uploadMeeting,
+  uploadMeetingFile
 } = require("../controllers/meetingController");
 
 router.post("/create", authMiddleware, createMeeting);
 
 router.get("/", authMiddleware, getMeetings);
+router.post("/upload", authMiddleware, uploadMeeting.single("file"), uploadMeetingFile);
 
 router.get("/:id", authMiddleware, getMeetingById);
 
