@@ -6,7 +6,6 @@ const compression = require("compression");
 const morgan = require("morgan");
 const rateLimit = require("express-rate-limit");
 require("dotenv").config();
-const passport = require("./config/passport");
 
 const app = express();
 const authRoutes = require("./routes/authRoutes");
@@ -30,7 +29,6 @@ app.use(compression());
 app.use(morgan("combined"));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-app.use(passport.initialize());
 app.use("/api", apiLimiter);
 app.use("/uploads", express.static("uploads"));
 app.use("/api/auth", authRoutes);

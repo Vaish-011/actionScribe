@@ -1,4 +1,5 @@
 const Groq = require("groq-sdk");
+const fs = require("fs");
 
 const groq = new Groq({
   apiKey: process.env.GROQ_API_KEY
@@ -17,12 +18,25 @@ const runPrompt = async ({ system, user, temperature = 0.2 }) => {
   return completion.choices[0].message.content;
 };
 
+const cleanSummaryText = (raw = "") => {
+  if (!raw) return "";
+
+  return raw
+    .replace(/\*\*/g, "")
+    .replace(/^\s*here'?s\s+a\s+clear\s+and\s+concise\s+summary\s+of\s+the\s+meeting\s+transcript\s*:?\s*/i, "")
+    .replace(/^\s*here'?s\s+a\s+concise\s+summary\s*:?\s*/i, "")
+    .replace(/^\s*meeting\s+summary\s*:?\s*/i, "")
+    .trim();
+};
+
 exports.generateSummary = async (transcript) => {
-  return runPrompt({
-    system: "You summarize meeting transcripts clearly and concisely.",
+  const rawSummary = await runPrompt({
+    system: "You summarize meeting transcripts clearly and concisely. Return plain text only, with no markdown, no bold markers, and no preface like 'Here is a summary'.",
     user: `Summarize the following meeting transcript:\n\n${transcript}`,
     temperature: 0.3
   });
+
+  return cleanSummaryText(rawSummary);
 };
 
 
@@ -108,4 +122,23 @@ exports.answerMeetingQuestion = async ({ transcript, summary, question }) => {
     user: `Meeting summary:\n${summary}\n\nTranscript:\n${transcript}\n\nQuestion: ${question}`,
     temperature: 0.1
   });
+};
+
+exports.transcribeAudio = async (audioFilePath) => {
+  if (!process.env.GROQ_API_KEY) {
+    throw new Error("GROQ_API_KEY is missing. Configure it to enable audio transcription.");
+  }
+
+  const fileStream = fs.createReadStream(audioFilePath);
+  const transcription = await groq.audio.transcriptions.create({
+    file: fileStream,
+    model: "whisper-large-v3-turbo"
+  });
+
+  const text = transcription?.text?.trim();
+  if (!text) {
+    throw new Error("Audio transcription returned empty text.");
+  }
+
+  return text;
 };

@@ -10,7 +10,6 @@ function Login() {
   const [password, setPassword] = useState("");
 
   const navigate = useNavigate();
-  const apiBase = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000/api";
 
   const loginUser = async () => {
 
@@ -74,18 +73,15 @@ function Login() {
           Login
         </button>
 
-        <button
-          onClick={() => (window.location.href = `${apiBase}/auth/google`)}
-          className="w-full mt-3 border border-gray-300 dark:border-gray-600 py-3 rounded-lg font-medium dark:text-white"
-        >
-          Continue with Google
-        </button>
-
         <p className="text-center mt-5 text-sm text-gray-600 dark:text-gray-300">
           Don't have an account?{" "}
           <Link to="/signup" className="text-blue-600 hover:underline">
             Create account
           </Link>
+        </p>
+
+        <p className="text-center mt-2 text-xs text-gray-500 dark:text-gray-400">
+          <Link to="/" className="hover:underline">Back to website</Link>
         </p>
 
       </div>

@@ -16,15 +16,19 @@ function Signup() {
 
     try{
 
-      await API.post("/auth/signup",{
+      const res = await API.post("/auth/signup",{
         name,
         email,
         password
       });
 
+      if (res.data?.token) {
+        localStorage.setItem("token", res.data.token);
+      }
+
       toast.success("Account created");
 
-      navigate("/");
+      navigate("/dashboard");
 
     }catch(error){
 
@@ -82,7 +86,7 @@ function Signup() {
 
         <p className="text-center mt-5 text-sm text-gray-600 dark:text-gray-300">
           Already have an account?{" "}
-          <Link to="/" className="text-blue-600 hover:underline">
+          <Link to="/login" className="text-blue-600 hover:underline">
             Login
           </Link>
         </p>

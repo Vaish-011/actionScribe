@@ -5,7 +5,8 @@ const {
   generateSummary,
   extractTasks,
   extractDecisions,
-  extractTopics
+  extractTopics,
+  transcribeAudio
 } = require("../services/aiService");
 const Meeting = require("../models/Meeting");
 const Task = require("../models/Task");
@@ -142,12 +143,59 @@ exports.uploadMeetingFile = async (req, res) => {
 
     const isAudio = req.file.mimetype.startsWith("audio/");
     const isPlainText = req.file.mimetype === "text/plain";
-    const rawText = isAudio
-      ? `Transcription placeholder for uploaded file ${req.file.originalname}`
-      : isPlainText
-        ? fs.readFileSync(req.file.path, "utf8")
-        : `Document extraction placeholder for uploaded file ${req.file.originalname}`;
 
+    if (isAudio) {
+      const transcript = await transcribeAudio(req.file.path);
+      const aiOutput = await runAiMeetingPipeline(transcript);
+
+      const meeting = await Meeting.create({
+        title: req.body.title || path.parse(req.file.originalname).name,
+        transcript,
+        summary: aiOutput.summary,
+        decisions: aiOutput.decisions,
+        topics: aiOutput.topics,
+        organization: user.organization,
+        createdBy: req.userId,
+        audioFile: req.file.path
+      });
+
+      const createdTasks = await createTasksFromAi({
+        tasks: aiOutput.tasks,
+        meetingId: meeting._id,
+        organization: user.organization
+      });
+
+      return res.status(201).json({
+        message: "Audio uploaded and processed",
+        meeting,
+        tasks: createdTasks
+      });
+    }
+
+    if (!isPlainText) {
+      const meeting = await Meeting.create({
+        title: req.body.title || path.parse(req.file.originalname).name,
+        transcript: "Document uploaded. Text extraction pending parser integration.",
+        summary: "Document uploaded successfully. Text extraction is pending configuration.",
+        decisions: [],
+        topics: [],
+        organization: user.organization,
+        createdBy: req.userId,
+        audioFile: null
+      });
+
+      if (fs.existsSync(req.file.path)) {
+        fs.unlinkSync(req.file.path);
+      }
+
+      return res.status(202).json({
+        message: "Document uploaded. Text extraction is not configured yet, so no tasks were extracted.",
+        meeting,
+        tasks: []
+      });
+    }
+
+    const rawText = fs.readFileSync(req.file.path, "utf8");
     const aiOutput = await runAiMeetingPipeline(rawText);
 
     const meeting = await Meeting.create({
@@ -158,7 +206,7 @@ exports.uploadMeetingFile = async (req, res) => {
       topics: aiOutput.topics,
       organization: user.organization,
       createdBy: req.userId,
-      audioFile: isAudio ? req.file.path : null
+      audioFile: null
     });
 
     const createdTasks = await createTasksFromAi({
@@ -168,7 +216,7 @@ exports.uploadMeetingFile = async (req, res) => {
     });
 
     // Keep audio file path for later playback. Cleanup only text-like uploads.
-    if (!isAudio) {
+    if (fs.existsSync(req.file.path)) {
       fs.unlinkSync(req.file.path);
     }
 
@@ -217,6 +265,43 @@ exports.getMeetingById = async (req, res) => {
 
     const tasks = await Task.find({ meetingId: meeting._id }).sort({ createdAt: -1 });
     res.json({ ...meeting.toObject(), tasks });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+exports.deleteMeeting = async (req, res) => {
+  try {
+    const user = await getCurrentUserWithOrg(req.userId);
+    if (!user) {
+      return res.status(400).json({ error: "User must belong to an organization" });
+    }
+
+    const meeting = await Meeting.findOne({
+      _id: req.params.id,
+      organization: user.organization
+    });
+
+    if (!meeting) {
+      return res.status(404).json({ error: "Meeting not found" });
+    }
+
+    // Delete audio file if it exists
+    if (meeting.audioFile && fs.existsSync(meeting.audioFile)) {
+      try {
+        fs.unlinkSync(meeting.audioFile);
+      } catch (unlinkError) {
+        console.warn(`Warning: Could not delete audio file ${meeting.audioFile}`, unlinkError.message);
+      }
+    }
+
+    // Delete all tasks associated with this meeting
+    await Task.deleteMany({ meetingId: meeting._id });
+
+    // Delete the meeting
+    await Meeting.deleteOne({ _id: meeting._id });
+
+    res.json({ message: "Meeting deleted successfully" });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

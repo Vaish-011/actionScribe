@@ -1,7 +1,6 @@
 const User = require("../models/User");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
-const passport = require("passport");
 const { ensureUserOrganization } = require("../services/organizationBootstrapService");
 
 const buildTokenAndUserResponse = (user) => {
@@ -65,7 +64,7 @@ exports.login = async (req, res) => {
     }
 
     if (!user.password) {
-      return res.status(400).json({ message: "Use Google login for this account" });
+      return res.status(400).json({ message: "This account has no password set" });
     }
 
     const isMatch = await bcrypt.compare(password, user.password);
@@ -79,44 +78,4 @@ exports.login = async (req, res) => {
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
-};
-
-const isGoogleConfigured = () => Boolean(
-  process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET
-);
-
-exports.googleAuth = (req, res, next) => {
-  if (!isGoogleConfigured()) {
-    return res.status(503).json({
-      error: "Google login is not configured on the server"
-    });
-  }
-  return passport.authenticate("google", { scope: ["profile", "email"] })(req, res, next);
-};
-
-exports.googleAuthCallback = (req, res, next) => {
-  if (!isGoogleConfigured()) {
-    return res.status(503).json({
-      error: "Google login is not configured on the server"
-    });
-  }
-
-  passport.authenticate("google", { session: false }, (err, user) => {
-    if (err) {
-      return res.status(500).json({ error: err.message });
-    }
-    if (!user) {
-      return res.status(401).json({ error: "Google authentication failed" });
-    }
-
-    ensureUserOrganization(user)
-      .then((updatedUser) => {
-        const payload = buildTokenAndUserResponse(updatedUser);
-        const frontendUrl = process.env.FRONTEND_URL || "http://localhost:5173";
-        return res.redirect(`${frontendUrl}/auth/callback?token=${payload.token}`);
-      })
-      .catch((bootstrapError) => {
-        return res.status(500).json({ error: bootstrapError.message });
-      });
-  })(req, res, next);
 };
