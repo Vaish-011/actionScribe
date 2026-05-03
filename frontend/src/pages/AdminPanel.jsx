@@ -19,18 +19,23 @@ function AdminPanel() {
     }
   };
 
-  const createOrganization = async () => {
+  const saveWorkspace = async () => {
     if (!orgName.trim()) {
       toast.error("Workspace name is required");
       return;
     }
 
     try {
-      await API.post("/organizations/create", { name: orgName.trim() });
-      toast.success("Workspace created");
+      if (organization?._id) {
+        await API.put("/organizations", { name: orgName.trim() });
+        toast.success("Workspace updated");
+      } else {
+        await API.post("/organizations/create", { name: orgName.trim() });
+        toast.success("Workspace created");
+      }
       loadOrganization();
     } catch (error) {
-      toast.error(error?.response?.data?.error || "Failed to create workspace");
+      toast.error(error?.response?.data?.error || "Failed to save workspace");
     }
   };
 
@@ -47,6 +52,22 @@ function AdminPanel() {
       loadOrganization();
     } catch (error) {
       toast.error(error?.response?.data?.error || "Failed to invite member");
+    }
+  };
+
+  const removeMember = async (memberId) => {
+    if (!memberId) return;
+
+    if (!window.confirm("Remove this member from the workspace?")) {
+      return;
+    }
+
+    try {
+      await API.delete(`/organizations/member/${memberId}`);
+      toast.success("Member removed");
+      loadOrganization();
+    } catch (error) {
+      toast.error(error?.response?.data?.error || "Failed to remove member");
     }
   };
 
@@ -68,7 +89,7 @@ function AdminPanel() {
             className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 dark:text-white px-3 py-2 mt-1"
             placeholder="ActionScribe Workspace"
           />
-          <button onClick={createOrganization} className="mt-3 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm">Save Workspace</button>
+          <button onClick={saveWorkspace} className="mt-3 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm">Save Workspace</button>
 
           {organization && (
             <div className="mt-4 rounded-lg bg-slate-50 dark:bg-gray-700 p-3 text-sm dark:text-gray-100">
@@ -110,6 +131,15 @@ function AdminPanel() {
                 <p className="font-medium dark:text-white">{member.user?.name || "Pending user"}</p>
                 <p className="text-sm text-gray-500 dark:text-gray-300">{member.user?.email || "Invitation pending"}</p>
                 <span className="inline-block mt-1 text-xs px-2 py-1 rounded-full bg-indigo-100 text-indigo-700">{member.role}</span>
+                <div className="mt-2">
+                  <button
+                    onClick={() => removeMember(member.user?._id)}
+                    disabled={!member.user?._id}
+                    className="text-xs px-2 py-1 rounded-md bg-red-100 text-red-700 hover:bg-red-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Remove
+                  </button>
+                </div>
               </div>
             ))}
             {!organization?.members?.length && <p className="text-sm text-gray-500">No members found.</p>}
