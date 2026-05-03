@@ -11,6 +11,11 @@ const {
 const Meeting = require("../models/Meeting");
 const Task = require("../models/Task");
 const { ensureUserOrganizationById } = require("../services/organizationBootstrapService");
+const {
+  getAccessContext,
+  buildMeetingFilter,
+  buildTaskFilter
+} = require("../services/accessScopeService");
 
 const storage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, "uploads/"),
@@ -232,12 +237,12 @@ exports.uploadMeetingFile = async (req, res) => {
 
 exports.getMeetings = async (req, res) => {
   try {
-    const user = await getCurrentUserWithOrg(req.userId);
-    if (!user) {
+    const context = await getAccessContext(req.userId);
+    if (!context) {
       return res.status(400).json({ error: "User must belong to an organization" });
     }
 
-    const meetings = await Meeting.find({ organization: user.organization })
+    const meetings = await Meeting.find(buildMeetingFilter(context))
       .populate("createdBy", "name email")
       .sort({ createdAt: -1 });
 
@@ -249,21 +254,23 @@ exports.getMeetings = async (req, res) => {
 
 exports.getMeetingById = async (req, res) => {
   try {
-    const user = await getCurrentUserWithOrg(req.userId);
-    if (!user) {
+    const context = await getAccessContext(req.userId);
+    if (!context) {
       return res.status(400).json({ error: "User must belong to an organization" });
     }
 
-    const meeting = await Meeting.findOne({
-      _id: req.params.id,
-      organization: user.organization
-    }).populate("createdBy", "name email");
+    const meeting = await Meeting.findOne(
+      buildMeetingFilter(context, { _id: req.params.id })
+    ).populate("createdBy", "name email");
 
     if (!meeting) {
       return res.status(404).json({ message: "Meeting not found" });
     }
 
-    const tasks = await Task.find({ meetingId: meeting._id }).sort({ createdAt: -1 });
+    const tasks = await Task.find(
+      buildTaskFilter(context, [meeting._id], { meetingId: meeting._id })
+    ).sort({ createdAt: -1 });
+
     res.json({ ...meeting.toObject(), tasks });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -272,15 +279,14 @@ exports.getMeetingById = async (req, res) => {
 
 exports.deleteMeeting = async (req, res) => {
   try {
-    const user = await getCurrentUserWithOrg(req.userId);
-    if (!user) {
+    const context = await getAccessContext(req.userId);
+    if (!context) {
       return res.status(400).json({ error: "User must belong to an organization" });
     }
 
-    const meeting = await Meeting.findOne({
-      _id: req.params.id,
-      organization: user.organization
-    });
+    const meeting = await Meeting.findOne(
+      buildMeetingFilter(context, { _id: req.params.id })
+    );
 
     if (!meeting) {
       return res.status(404).json({ error: "Meeting not found" });

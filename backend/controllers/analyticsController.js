@@ -1,22 +1,31 @@
 const Meeting = require("../models/Meeting");
 const Task = require("../models/Task");
-const { ensureUserOrganizationById } = require("../services/organizationBootstrapService");
+const {
+  getAccessContext,
+  buildMeetingFilter,
+  buildTaskFilter
+} = require("../services/accessScopeService");
 
 exports.getTeamDashboard = async (req, res) => {
   try {
-    const user = await ensureUserOrganizationById(req.userId);
-    if (!user || !user.organization) {
+    const context = await getAccessContext(req.userId);
+    if (!context) {
       return res.status(400).json({ error: "User must belong to an organization" });
     }
 
-    const organization = user.organization;
+    const memberMeetingIds = (await Meeting.find(buildMeetingFilter(context)).select("_id"))
+      .map((m) => m._id);
+    const taskScope = buildTaskFilter(context, memberMeetingIds);
 
     const [totalMeetings, totalTasks, completedTasks, pendingTasks, tasks] = await Promise.all([
-      Meeting.countDocuments({ organization }),
-      Task.countDocuments({ organization }),
-      Task.countDocuments({ organization, status: "completed" }),
-      Task.countDocuments({ organization, status: { $in: ["pending", "in-progress", "blocked"] } }),
-      Task.find({ organization }).populate("assignedTo", "name")
+      Meeting.countDocuments(buildMeetingFilter(context)),
+      Task.countDocuments(taskScope),
+      Task.countDocuments({ ...taskScope, status: "completed" }),
+      Task.countDocuments({
+        ...taskScope,
+        status: { $in: ["pending", "in-progress", "blocked"] }
+      }),
+      Task.find(taskScope).populate("assignedTo", "name")
     ]);
 
     const tasksPerMemberMap = {};
