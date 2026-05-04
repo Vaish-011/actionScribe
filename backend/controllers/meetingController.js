@@ -138,6 +138,48 @@ exports.createMeeting = async (req, res) => {
   }
 };
 
+exports.updateMeetingDetails = async (req, res) => {
+  try {
+    const context = await getAccessContext(req.userId);
+    if (!context) {
+      return res.status(400).json({ error: "User must belong to an organization" });
+    }
+
+    const { title, summary } = req.body;
+    const updates = {};
+
+    if (typeof title === "string") {
+      updates.title = title.trim();
+    }
+
+    if (typeof summary === "string") {
+      updates.summary = summary.trim();
+    }
+
+    if (Object.keys(updates).length === 0) {
+      return res.status(400).json({ error: "No meeting fields provided" });
+    }
+
+    const meeting = await Meeting.findOneAndUpdate(
+      buildMeetingFilter(context, { _id: req.params.id }),
+      updates,
+      { returnDocument: "after" }
+    ).populate("createdBy", "name email");
+
+    if (!meeting) {
+      return res.status(404).json({ error: "Meeting not found" });
+    }
+
+    const tasks = await Task.find(
+      buildTaskFilter(context, [meeting._id], { meetingId: meeting._id })
+    ).sort({ createdAt: -1 });
+
+    res.json({ ...meeting.toObject(), tasks });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
 exports.uploadMeetingFile = async (req, res) => {
   try {
     if (!req.file) {

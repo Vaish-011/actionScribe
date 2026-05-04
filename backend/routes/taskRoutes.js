@@ -8,10 +8,13 @@ const {
   markTaskCompleted,
   getTasksByMeeting,
   updateTaskStatus,
+  updateTaskDetails,
   assignTask
 } = require("../controllers/taskController");
 
 router.get("/", authMiddleware, getAllTasks);
+
+router.patch("/:id", authMiddleware, updateTaskDetails);
 
 router.patch("/:id/complete", authMiddleware, markTaskCompleted);
 router.patch("/:id/status", authMiddleware, updateTaskStatus);

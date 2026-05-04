@@ -5,6 +5,7 @@ const authMiddleware = require("../middleware/authMiddleware");
 
 const {
   createMeeting,
+  updateMeetingDetails,
   getMeetings,
   getMeetingById,
   uploadMeeting,
@@ -13,6 +14,7 @@ const {
 } = require("../controllers/meetingController");
 
 router.post("/create", authMiddleware, createMeeting);
+router.patch("/:id", authMiddleware, updateMeetingDetails);
 
 router.get("/", authMiddleware, getMeetings);
 router.post(
