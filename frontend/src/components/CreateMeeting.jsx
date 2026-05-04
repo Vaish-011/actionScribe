@@ -96,11 +96,11 @@ function CreateMeeting({ refresh }) {
         onChange={(e) => setTranscript(e.target.value)}
       />
 
-      <div className="text-sm text-gray-600 dark:text-gray-300 mb-2">or upload transcript/audio</div>
+      <div className="text-sm text-gray-600 dark:text-gray-300 mb-2">or upload transcript</div>
       <input
         type="file"
         className="w-full mb-3 text-sm"
-        accept=".txt,.pdf,.docx,.mp3,.wav,.m4a,.mpeg,.mpg"
+        accept=".txt,.pdf,.docx"
         onChange={(e) => setFile(e.target.files?.[0] || null)}
       />
 
@@ -134,6 +134,22 @@ function CreateMeeting({ refresh }) {
               </ul>
             ) : (
               <p className="text-sm text-gray-500">No tasks extracted.</p>
+            )}
+          </div>
+
+          <div>
+            <h3 className="font-semibold dark:text-white">Extracted Decisions</h3>
+            {lastResult.decisions?.length ? (
+              <ul className="mt-2 space-y-2 text-sm text-gray-700 dark:text-gray-100">
+                {lastResult.decisions.map((decision) => (
+                  <li key={decision._id || decision.decision} className="rounded-md bg-white/70 dark:bg-gray-800/60 p-2">
+                    <p className="font-medium">{decision.decision}</p>
+                    <p>Context: {decision.context || "No context"}</p>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-sm text-gray-500">No decisions extracted.</p>
             )}
           </div>
         </div>

@@ -13,6 +13,7 @@ const userRoutes = require("./routes/userRoutes");
 const meetingRoutes = require("./routes/meetingRoutes");
 const taskRoutes = require("./routes/taskRoutes");
 const organizationRoutes = require("./routes/organizationRoutes");
+const decisionRoutes = require("./routes/decisionRoutes");
 const analyticsRoutes = require("./routes/analyticsRoutes");
 const aiFeaturesRoutes = require("./routes/aiFeaturesRoutes");
 
@@ -36,6 +37,7 @@ app.use("/api/user", userRoutes);
 app.use("/api/meetings", meetingRoutes);
 app.use("/api/tasks", taskRoutes);
 app.use("/api/organizations", organizationRoutes);
+app.use("/api/decisions", decisionRoutes);
 app.use("/api/analytics", analyticsRoutes);
 app.use("/api/ai", aiFeaturesRoutes);
 app.get("/", (req, res) => {

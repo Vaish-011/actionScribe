@@ -17,8 +17,8 @@ const MeetingSchema = new mongoose.Schema({
   },
 
   decisions: [{
-    decision: String,
-    context: String
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "Decision"
   }],
 
   topics: [{

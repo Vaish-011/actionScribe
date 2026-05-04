@@ -10,6 +10,7 @@ const {
 } = require("../services/aiService");
 const Meeting = require("../models/Meeting");
 const Task = require("../models/Task");
+const Decision = require("../models/Decision");
 const { ensureUserOrganizationById } = require("../services/organizationBootstrapService");
 const {
   getAccessContext,
@@ -75,6 +76,27 @@ const createTasksFromAi = async ({ tasks, meetingId, organization }) => {
   return created;
 };
 
+const createDecisionsFromAi = async ({ decisions, meetingId, createdBy }) => {
+  const created = [];
+
+  for (const item of decisions) {
+    const decisionText = typeof item === "string" ? item : item?.decision || item?.title || "Decision";
+    const context = typeof item === "string" ? "" : item?.context || item?.reason || "";
+
+    const savedDecision = await Decision.create({
+      meeting: meetingId,
+      decision: decisionText,
+      context,
+      status: "accepted",
+      createdBy
+    });
+
+    created.push(savedDecision);
+  }
+
+  return created;
+};
+
 const cleanupUploadedFile = (filePath) => {
   if (filePath && fs.existsSync(filePath)) {
     fs.unlinkSync(filePath);
@@ -115,7 +137,6 @@ exports.createMeeting = async (req, res) => {
       title,
       transcript,
       summary: aiOutput.summary,
-      decisions: aiOutput.decisions,
       topics: aiOutput.topics,
       participants,
       organization: user.organization,
@@ -128,10 +149,20 @@ exports.createMeeting = async (req, res) => {
       organization: user.organization
     });
 
+    const createdDecisions = await createDecisionsFromAi({
+      decisions: aiOutput.decisions,
+      meetingId: meeting._id,
+      createdBy: req.userId
+    });
+
+    meeting.decisions = createdDecisions.map((decision) => decision._id);
+    await meeting.save();
+
     res.status(201).json({
       message: "Meeting created and processed",
       meeting,
-      tasks: createdTasks
+      tasks: createdTasks,
+      decisions: createdDecisions
     });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -216,7 +247,6 @@ exports.uploadMeetingFile = async (req, res) => {
         title: req.body.title || path.parse(req.file.originalname).name,
         transcript,
         summary: aiOutput.summary,
-        decisions: aiOutput.decisions,
         topics: aiOutput.topics,
         organization: user.organization,
         createdBy: req.userId,
@@ -229,10 +259,20 @@ exports.uploadMeetingFile = async (req, res) => {
         organization: user.organization
       });
 
+      const createdDecisions = await createDecisionsFromAi({
+        decisions: aiOutput.decisions,
+        meetingId: meeting._id,
+        createdBy: req.userId
+      });
+
+      meeting.decisions = createdDecisions.map((decision) => decision._id);
+      await meeting.save();
+
       return res.status(201).json({
         message: "Audio uploaded and processed",
         meeting,
-        tasks: createdTasks
+        tasks: createdTasks,
+        decisions: createdDecisions
       });
     }
 
@@ -241,7 +281,6 @@ exports.uploadMeetingFile = async (req, res) => {
         title: req.body.title || path.parse(req.file.originalname).name,
         transcript: "Document uploaded. Text extraction pending parser integration.",
         summary: "Document uploaded successfully. Text extraction is pending configuration.",
-        decisions: [],
         topics: [],
         organization: user.organization,
         createdBy: req.userId,
@@ -262,7 +301,6 @@ exports.uploadMeetingFile = async (req, res) => {
       title: req.body.title || path.parse(req.file.originalname).name,
       transcript: rawText,
       summary: aiOutput.summary,
-      decisions: aiOutput.decisions,
       topics: aiOutput.topics,
       organization: user.organization,
       createdBy: req.userId,
@@ -275,6 +313,15 @@ exports.uploadMeetingFile = async (req, res) => {
       organization: user.organization
     });
 
+    const createdDecisions = await createDecisionsFromAi({
+      decisions: aiOutput.decisions,
+      meetingId: meeting._id,
+      createdBy: req.userId
+    });
+
+    meeting.decisions = createdDecisions.map((decision) => decision._id);
+    await meeting.save();
+
     // Keep audio file path for later playback. Cleanup only text-like uploads.
     if (fs.existsSync(req.file.path)) {
       fs.unlinkSync(req.file.path);
@@ -283,7 +330,8 @@ exports.uploadMeetingFile = async (req, res) => {
     res.status(201).json({
       message: "Meeting uploaded and processed",
       meeting,
-      tasks: createdTasks
+      tasks: createdTasks,
+      decisions: createdDecisions
     });
   } catch (error) {
     const message = error?.message || "Internal server error";
@@ -301,6 +349,7 @@ exports.getMeetings = async (req, res) => {
 
     const meetings = await Meeting.find(buildMeetingFilter(context))
       .populate("createdBy", "name email")
+      .populate({ path: "decisions", populate: { path: "createdBy", select: "name email" } })
       .sort({ createdAt: -1 });
 
     res.json(meetings);
@@ -318,7 +367,9 @@ exports.getMeetingById = async (req, res) => {
 
     const meeting = await Meeting.findOne(
       buildMeetingFilter(context, { _id: req.params.id })
-    ).populate("createdBy", "name email");
+    )
+      .populate("createdBy", "name email")
+      .populate({ path: "decisions", populate: { path: "createdBy", select: "name email" } });
 
     if (!meeting) {
       return res.status(404).json({ message: "Meeting not found" });
@@ -360,6 +411,9 @@ exports.deleteMeeting = async (req, res) => {
 
     // Delete all tasks associated with this meeting
     await Task.deleteMany({ meetingId: meeting._id });
+
+    // Delete associated decisions
+    await Decision.deleteMany({ meeting: meeting._id });
 
     // Delete the meeting
     await Meeting.deleteOne({ _id: meeting._id });

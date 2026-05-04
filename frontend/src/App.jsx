@@ -3,6 +3,7 @@ import Landing from "./pages/Landing";
 import Dashboard from "./pages/Dashboard";
 import Meetings from "./pages/Meetings";
 import Insights from "./pages/Insights";
+import KnowledgeGraph from "./pages/KnowledgeGraph";
 import AdminPanel from "./pages/AdminPanel";
 import Calendar from "./pages/Calendar";
 import Login from "./pages/Login";
@@ -46,6 +47,15 @@ function App() {
           element={
             <ProtectedRoute>
               <Insights />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/knowledge-graph"
+          element={
+            <ProtectedRoute>
+              <KnowledgeGraph />
             </ProtectedRoute>
           }
         />

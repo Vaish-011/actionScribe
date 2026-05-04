@@ -5,6 +5,7 @@ const navItems = [
   { label: "Dashboard", path: "/dashboard" },
   { label: "Meetings", path: "/meetings" },
   { label: "Insights", path: "/insights" },
+  { label: "Knowledge Graph", path: "/knowledge-graph" },
   { label: "Calendar", path: "/calendar" },
 ];
 

@@ -17,6 +17,7 @@ const cleanSummaryText = (raw = "") => {
 function Dashboard() {
   const [tasks, setTasks] = useState([]);
   const [metrics, setMetrics] = useState(null);
+  const [execution, setExecution] = useState(null);
   const [meetings, setMeetings] = useState([]);
   const [insights, setInsights] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
@@ -24,6 +25,9 @@ function Dashboard() {
   const [selectedMeetingId, setSelectedMeetingId] = useState("");
   const [chatQuestion, setChatQuestion] = useState("");
   const [chatAnswer, setChatAnswer] = useState("");
+  const [orgMemoryQuestion, setOrgMemoryQuestion] = useState("");
+  const [orgMemoryAnswer, setOrgMemoryAnswer] = useState("");
+  const [orgMemoryResults, setOrgMemoryResults] = useState([]);
   const [followUpMap, setFollowUpMap] = useState({});
   const [loadingFollowUpId, setLoadingFollowUpId] = useState("");
 
@@ -54,8 +58,10 @@ function Dashboard() {
     try {
       const res = await API.get("/analytics/dashboard");
       setMetrics(res.data.metrics);
+      setExecution(res.data.execution || null);
     } catch (error) {
       setMetrics(null);
+      setExecution(null);
       toast.error(error?.response?.data?.error || "Failed to load team metrics");
     }
   };
@@ -104,6 +110,7 @@ function Dashboard() {
     try {
       const res = await API.get(`/ai/search?q=${encodeURIComponent(searchQuery.trim())}`);
       setSearchResults(res.data.results || []);
+      setOrgMemoryResults(res.data.results || []);
     } catch (error) {
       setSearchResults([]);
       toast.error(error?.response?.data?.error || "Search failed");
@@ -122,6 +129,22 @@ function Dashboard() {
       setChatAnswer(res.data.answer || "No answer available");
     } catch (error) {
       toast.error(error?.response?.data?.error || "Meeting chat failed");
+    }
+  };
+
+  const askOrgMemoryQuestion = async () => {
+    if (!orgMemoryQuestion.trim()) {
+      return;
+    }
+
+    try {
+      const res = await API.post(`/ai/memory-chat`, {
+        question: orgMemoryQuestion
+      });
+      setOrgMemoryAnswer(res.data.answer || "No answer available");
+      setOrgMemoryResults(res.data.results || []);
+    } catch (error) {
+      toast.error(error?.response?.data?.error || "Org memory chat failed");
     }
   };
 
@@ -197,12 +220,13 @@ function Dashboard() {
         </section>
 
         {metrics && (
-          <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 mb-6">
+          <div className="grid grid-cols-2 lg:grid-cols-6 gap-3 mb-6">
             <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm border border-gray-100 dark:border-gray-700"><p className="text-xs uppercase tracking-wide text-gray-500">Meetings</p><p className="text-2xl font-bold dark:text-white">{metrics.totalMeetings}</p></div>
             <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm border border-gray-100 dark:border-gray-700"><p className="text-xs uppercase tracking-wide text-gray-500">Tasks</p><p className="text-2xl font-bold dark:text-white">{metrics.totalTasks}</p></div>
             <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm border border-gray-100 dark:border-gray-700"><p className="text-xs uppercase tracking-wide text-gray-500">Completed</p><p className="text-2xl font-bold dark:text-white">{metrics.completedTasks}</p></div>
             <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm border border-gray-100 dark:border-gray-700"><p className="text-xs uppercase tracking-wide text-gray-500">Pending</p><p className="text-2xl font-bold dark:text-white">{metrics.pendingTasks}</p></div>
             <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm border border-gray-100 dark:border-gray-700"><p className="text-xs uppercase tracking-wide text-gray-500">Productivity</p><p className="text-2xl font-bold dark:text-white">{metrics.completionRate}%</p></div>
+            <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm border border-gray-100 dark:border-gray-700"><p className="text-xs uppercase tracking-wide text-gray-500">Meeting ROI</p><p className="text-2xl font-bold dark:text-white">{metrics.meetingEffectiveness ?? 0}%</p></div>
           </div>
         )}
 
@@ -224,9 +248,26 @@ function Dashboard() {
             <div className="space-y-2 max-h-52 overflow-auto">
               {searchResults.length === 0 && <p className="text-sm text-gray-500">No search results yet.</p>}
               {searchResults.map((meeting) => (
-                <div key={meeting._id} className="rounded-lg border border-gray-200 dark:border-gray-600 p-3">
-                  <p className="font-semibold dark:text-white">{meeting.title}</p>
+                <div key={meeting._id} className="rounded-lg border border-gray-200 dark:border-gray-600 p-3 space-y-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="font-semibold dark:text-white">{meeting.title}</p>
+                    <span className="text-xs px-2 py-1 rounded-full bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-200">
+                      score {meeting.score || 0}
+                    </span>
+                  </div>
                   <p className="text-sm text-gray-600 dark:text-gray-300">{cleanSummaryText(meeting.summary) || "No summary available"}</p>
+                  {meeting.relatedMeetings?.length ? (
+                    <p className="text-xs text-gray-500">Related: {meeting.relatedMeetings.map((item) => item.title).join(", ")}</p>
+                  ) : null}
+                  {meeting.timeline?.length ? (
+                    <div className="text-xs text-gray-500 space-y-1">
+                      {meeting.timeline.slice(0, 3).map((item, index) => (
+                        <p key={`${meeting._id}-${index}`}>
+                          {item.type}: {item.title}
+                        </p>
+                      ))}
+                    </div>
+                  ) : null}
                 </div>
               ))}
             </div>
@@ -257,6 +298,55 @@ function Dashboard() {
             )}
           </div>
         </section>
+
+        {execution && (
+          <section className="grid lg:grid-cols-3 gap-4 mb-6">
+            <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm border border-gray-100 dark:border-gray-700">
+              <h2 className="text-lg font-bold mb-3 dark:text-white">Risk Signals</h2>
+              <div className="space-y-2 max-h-64 overflow-auto">
+                {execution.riskTasks?.length ? execution.riskTasks.map((task) => (
+                  <div key={task.id} className="rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="font-medium text-rose-900">{task.title}</p>
+                      <span className="text-xs font-semibold text-rose-700">{task.riskScore}</span>
+                    </div>
+                    <p className="text-rose-700">Owner: {task.owner || "Unassigned"}</p>
+                    <p className="text-rose-700">Status: {task.status}</p>
+                    <p className="text-rose-700">Deadline: {task.deadline ? new Date(task.deadline).toLocaleDateString() : "Not set"}</p>
+                  </div>
+                )) : <p className="text-sm text-gray-500">No high-risk tasks found.</p>}
+              </div>
+            </div>
+
+            <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm border border-gray-100 dark:border-gray-700">
+              <h2 className="text-lg font-bold mb-3 dark:text-white">Workload Balance</h2>
+              <div className="space-y-2 max-h-64 overflow-auto">
+                {execution.overloadedPeople?.length ? execution.overloadedPeople.map((person) => (
+                  <div key={person.name} className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm">
+                    <p className="font-medium text-amber-900">{person.name}</p>
+                    <p className="text-amber-700">Tasks: {person.total}</p>
+                    <p className="text-amber-700">Overdue: {person.overdue}</p>
+                    <p className="text-amber-700">Average risk: {person.averageRisk}</p>
+                  </div>
+                )) : <p className="text-sm text-gray-500">No overload detected.</p>}
+              </div>
+            </div>
+
+            <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm border border-gray-100 dark:border-gray-700">
+              <h2 className="text-lg font-bold mb-3 dark:text-white">Bottlenecks</h2>
+              <div className="space-y-2 max-h-64 overflow-auto">
+                {execution.bottlenecks?.length ? execution.bottlenecks.map((task) => (
+                  <div key={task.id} className="rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm">
+                    <p className="font-medium text-blue-900">{task.title}</p>
+                    <p className="text-blue-700">Owner: {task.owner}</p>
+                    <p className="text-blue-700">Priority: {task.priority}</p>
+                    <p className="text-blue-700">Meeting: {task.meetingTitle || "N/A"}</p>
+                  </div>
+                )) : <p className="text-sm text-gray-500">No bottlenecks detected.</p>}
+              </div>
+            </div>
+          </section>
+        )}
 
         <section className="grid lg:grid-cols-3 gap-4 mb-6">
           <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm border border-gray-100 dark:border-gray-700">
@@ -305,6 +395,35 @@ function Dashboard() {
             <div className="rounded-lg bg-slate-50 dark:bg-gray-700 p-3 min-h-24 text-sm dark:text-white">
               {chatAnswer || "Assistant response will appear here."}
             </div>
+          </div>
+        </section>
+
+        <section className="mb-6 bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm border border-gray-100 dark:border-gray-700">
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-lg font-bold dark:text-white">Org Memory Copilot</h2>
+            <button onClick={askOrgMemoryQuestion} className="bg-indigo-600 hover:bg-indigo-700 text-white text-sm px-3 py-1.5 rounded-lg">Ask Org Memory</button>
+          </div>
+          <div className="grid md:grid-cols-[1fr_auto] gap-2 mb-3">
+            <input
+              className="rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 dark:text-white px-3 py-2"
+              placeholder="Ask across meetings, decisions, and tasks"
+              value={orgMemoryQuestion}
+              onChange={(e) => setOrgMemoryQuestion(e.target.value)}
+            />
+            <button onClick={askOrgMemoryQuestion} className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg">Search Memory</button>
+          </div>
+          <div className="rounded-lg bg-slate-50 dark:bg-gray-700 p-3 text-sm dark:text-white whitespace-pre-wrap mb-3">
+            {orgMemoryAnswer || "Your organization-wide answer will appear here."}
+          </div>
+          <div className="space-y-2 max-h-56 overflow-auto">
+            {orgMemoryResults.length === 0 && <p className="text-sm text-gray-500">No org memory results yet.</p>}
+            {orgMemoryResults.map((meeting) => (
+              <div key={meeting._id} className="rounded-lg border border-gray-200 dark:border-gray-600 p-3">
+                <p className="font-semibold dark:text-white">{meeting.title}</p>
+                <p className="text-xs text-gray-500">Relevance score: {meeting.score || 0}</p>
+                {meeting.decisions?.length ? <p className="text-sm text-gray-600 dark:text-gray-300">Decisions: {meeting.decisions.slice(0, 2).map((item) => item.decision).join("; ")}</p> : null}
+              </div>
+            ))}
           </div>
         </section>
 

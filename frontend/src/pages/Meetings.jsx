@@ -20,6 +20,11 @@ function Meetings() {
   const [saving, setSaving] = useState(false);
   const [meetingDraft, setMeetingDraft] = useState({ title: "", summary: "" });
   const [taskDrafts, setTaskDrafts] = useState([]);
+  const [decisions, setDecisions] = useState([]);
+  const [decisionDraft, setDecisionDraft] = useState({ decision: "", context: "" });
+  const [editingDecisionId, setEditingDecisionId] = useState("");
+  const [decisionHistory, setDecisionHistory] = useState({});
+  const [savingDecision, setSavingDecision] = useState(false);
 
   const syncDrafts = (meeting) => {
     setSelectedMeeting(meeting);
@@ -31,7 +36,21 @@ function Meetings() {
       ...task,
       deadline: task.deadline ? new Date(task.deadline).toISOString().slice(0, 10) : ""
     })));
+    setDecisions(Array.isArray(meeting?.decisions) ? meeting.decisions : []);
+    setDecisionDraft({ decision: "", context: "" });
+    setEditingDecisionId("");
+    setDecisionHistory({});
     setIsEditing(false);
+  };
+
+  const loadDecisions = async (meetingId) => {
+    try {
+      const res = await API.get(`/decisions/meeting/${meetingId}`);
+      setDecisions(res.data || []);
+    } catch (error) {
+      setDecisions([]);
+      toast.error(error?.response?.data?.message || "Failed to load decisions");
+    }
   };
 
   const loadMeetings = async () => {
@@ -43,6 +62,7 @@ function Meetings() {
       if (!selectedMeeting && list.length) {
         const detail = await API.get(`/meetings/${list[0]._id}`);
         syncDrafts(detail.data);
+        await loadDecisions(list[0]._id);
       }
     } catch (error) {
       toast.error(error?.response?.data?.error || "Failed to load meetings");
@@ -53,6 +73,7 @@ function Meetings() {
     try {
       const res = await API.get(`/meetings/${meetingId}`);
       syncDrafts(res.data);
+      await loadDecisions(meetingId);
     } catch (error) {
       toast.error(error?.response?.data?.error || "Failed to load meeting details");
     }
@@ -126,6 +147,77 @@ function Meetings() {
       toast.error(error?.response?.data?.error || "Failed to save changes");
     } finally {
       setSaving(false);
+    }
+  };
+
+  const createDecision = async () => {
+    if (!selectedMeeting || !decisionDraft.decision.trim()) {
+      toast.error("Enter a decision first");
+      return;
+    }
+
+    try {
+      setSavingDecision(true);
+      await API.post("/decisions", {
+        meetingId: selectedMeeting._id,
+        decision: decisionDraft.decision,
+        context: decisionDraft.context
+      });
+      setDecisionDraft({ decision: "", context: "" });
+      await loadDecisions(selectedMeeting._id);
+      toast.success("Decision added");
+    } catch (error) {
+      toast.error(error?.response?.data?.message || "Failed to add decision");
+    } finally {
+      setSavingDecision(false);
+    }
+  };
+
+  const saveDecision = async (decisionId) => {
+    const draft = decisionHistory[decisionId]?.draft;
+    if (!draft?.decision?.trim()) {
+      toast.error("Decision text cannot be empty");
+      return;
+    }
+
+    try {
+      setSavingDecision(true);
+      await API.patch(`/decisions/${decisionId}`, {
+        updates: {
+          decision: draft.decision,
+          context: draft.context,
+          status: draft.status
+        },
+        reason: draft.reason
+      });
+      setEditingDecisionId("");
+      setDecisionHistory((current) => {
+        const next = { ...current };
+        delete next[decisionId];
+        return next;
+      });
+      await loadDecisions(selectedMeeting._id);
+      toast.success("Decision updated");
+    } catch (error) {
+      toast.error(error?.response?.data?.message || "Failed to update decision");
+    } finally {
+      setSavingDecision(false);
+    }
+  };
+
+  const loadDecisionHistory = async (decisionId) => {
+    try {
+      const res = await API.get(`/decisions/${decisionId}/history`);
+      setDecisionHistory((current) => ({
+        ...current,
+        [decisionId]: {
+          history: res.data || [],
+          draft: current[decisionId]?.draft || null,
+          open: true
+        }
+      }));
+    } catch (error) {
+      toast.error(error?.response?.data?.message || "Failed to load history");
     }
   };
 
@@ -378,6 +470,189 @@ function Meetings() {
                     </li>
                   ))}
                 </ul>
+              </div>
+
+              {/* DECISIONS */}
+              <div className="rounded-lg bg-slate-50 dark:bg-gray-700 p-3">
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="font-semibold dark:text-white">Decision Registry</h3>
+                  <span className="text-xs px-2 py-1 rounded-full bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-200">
+                    {decisions.length} total
+                  </span>
+                </div>
+
+                <div className="grid md:grid-cols-[1fr_auto] gap-2 mb-3">
+                  <input
+                    className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-black dark:text-white px-3 py-2 text-sm"
+                    placeholder="Decision statement"
+                    value={decisionDraft.decision}
+                    onChange={(e) => setDecisionDraft((current) => ({ ...current, decision: e.target.value }))}
+                  />
+                  <button
+                    onClick={createDecision}
+                    disabled={savingDecision}
+                    className="px-4 py-2 rounded-md bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white text-sm font-medium"
+                  >
+                    Add Decision
+                  </button>
+                </div>
+                <textarea
+                  className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-black dark:text-white px-3 py-2 text-sm mb-3"
+                  placeholder="Context / rationale"
+                  rows={2}
+                  value={decisionDraft.context}
+                  onChange={(e) => setDecisionDraft((current) => ({ ...current, context: e.target.value }))}
+                />
+
+                {decisions.length === 0 ? (
+                  <p className="text-sm text-gray-500">No decisions recorded yet.</p>
+                ) : (
+                  <div className="space-y-3">
+                    {decisions.map((decision) => {
+                      const editState = decisionHistory[decision._id]?.draft || {
+                        decision: decision.decision || "",
+                        context: decision.context || "",
+                        status: decision.status || "accepted",
+                        reason: ""
+                      };
+                      const history = decisionHistory[decision._id]?.history || [];
+                      const isOpen = Boolean(decisionHistory[decision._id]?.open);
+
+                      return (
+                        <div key={decision._id} className="rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 p-3 space-y-2">
+                          {editingDecisionId === decision._id ? (
+                            <>
+                              <input
+                                className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-black dark:text-white px-3 py-2 text-sm"
+                                value={editState.decision}
+                                onChange={(e) => setDecisionHistory((current) => ({
+                                  ...current,
+                                  [decision._id]: { ...current[decision._id], draft: { ...editState, decision: e.target.value } }
+                                }))}
+                              />
+                              <textarea
+                                className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-black dark:text-white px-3 py-2 text-sm"
+                                rows={2}
+                                value={editState.context}
+                                onChange={(e) => setDecisionHistory((current) => ({
+                                  ...current,
+                                  [decision._id]: { ...current[decision._id], draft: { ...editState, context: e.target.value } }
+                                }))}
+                              />
+                              <div className="grid md:grid-cols-2 gap-2">
+                                <select
+                                  className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-black dark:text-white px-3 py-2 text-sm"
+                                  value={editState.status}
+                                  onChange={(e) => setDecisionHistory((current) => ({
+                                    ...current,
+                                    [decision._id]: { ...current[decision._id], draft: { ...editState, status: e.target.value } }
+                                  }))}
+                                >
+                                  <option value="accepted">Accepted</option>
+                                  <option value="proposed">Proposed</option>
+                                  <option value="deferred">Deferred</option>
+                                  <option value="rejected">Rejected</option>
+                                </select>
+                                <input
+                                  className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-black dark:text-white px-3 py-2 text-sm"
+                                  placeholder="Why changed?"
+                                  value={editState.reason}
+                                  onChange={(e) => setDecisionHistory((current) => ({
+                                    ...current,
+                                    [decision._id]: { ...current[decision._id], draft: { ...editState, reason: e.target.value } }
+                                  }))}
+                                />
+                              </div>
+                              <div className="flex gap-2">
+                                <button
+                                  onClick={() => saveDecision(decision._id)}
+                                  disabled={savingDecision}
+                                  className="px-3 py-1.5 rounded-md bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 text-white text-sm"
+                                >
+                                  Save Change
+                                </button>
+                                <button
+                                  onClick={() => setEditingDecisionId("")}
+                                  className="px-3 py-1.5 rounded-md bg-gray-500 hover:bg-gray-600 text-white text-sm"
+                                >
+                                  Cancel
+                                </button>
+                              </div>
+                            </>
+                          ) : (
+                            <>
+                              <div className="flex items-start justify-between gap-3">
+                                <div>
+                                  <p className="font-medium dark:text-white">{decision.decision}</p>
+                                  <p className="text-sm text-gray-600 dark:text-gray-300">{decision.context || "No context"}</p>
+                                  <p className="text-xs text-gray-500 mt-1">Status: {decision.status || "accepted"}</p>
+                                </div>
+                                <button
+                                  onClick={() => {
+                                    setEditingDecisionId(decision._id);
+                                    setDecisionHistory((current) => ({
+                                      ...current,
+                                      [decision._id]: {
+                                        ...current[decision._id],
+                                        draft: {
+                                          decision: decision.decision || "",
+                                          context: decision.context || "",
+                                          status: decision.status || "accepted",
+                                          reason: ""
+                                        }
+                                      }
+                                    }));
+                                  }}
+                                  className="px-3 py-1 rounded-md bg-indigo-600 hover:bg-indigo-700 text-white text-sm"
+                                >
+                                  Edit
+                                </button>
+                              </div>
+
+                              <button
+                                onClick={() => {
+                                  const nextOpen = !isOpen;
+                                  setDecisionHistory((current) => ({
+                                    ...current,
+                                    [decision._id]: {
+                                      ...current[decision._id],
+                                      open: nextOpen,
+                                      history: current[decision._id]?.history || []
+                                    }
+                                  }));
+                                  if (!history.length) {
+                                    loadDecisionHistory(decision._id);
+                                  }
+                                }}
+                                className="text-sm text-indigo-600 dark:text-indigo-300"
+                              >
+                                {isOpen ? "Hide history" : "Show history"}
+                              </button>
+
+                              {isOpen && (
+                                <div className="rounded-md bg-slate-50 dark:bg-gray-700 p-2 text-xs space-y-2">
+                                  {history.length === 0 ? (
+                                    <p className="text-gray-500">No change history yet.</p>
+                                  ) : (
+                                    history.map((entry, index) => (
+                                      <div key={`${decision._id}-${index}`} className="border border-gray-200 dark:border-gray-600 rounded p-2">
+                                        <p className="font-medium text-gray-800 dark:text-gray-100">
+                                          {entry.reason || "Updated decision"}
+                                        </p>
+                                        <p className="text-gray-500">{entry.changedAt ? new Date(entry.changedAt).toLocaleString() : "Unknown time"}</p>
+                                        <p className="text-gray-500">By: {entry.changedBy?.name || entry.changedBy?.email || "Unknown"}</p>
+                                      </div>
+                                    ))
+                                  )}
+                                </div>
+                              )}
+                            </>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
 
             </div>

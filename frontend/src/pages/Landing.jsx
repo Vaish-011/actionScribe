@@ -25,6 +25,10 @@ const features = [
   {
     title: "Exports + Reporting",
     text: "Export task lists and outcomes for status reviews, stakeholders, and planning sessions."
+  },
+  {
+    title: "Project Knowledge Graph",
+    text: "Visualize meetings, decisions, tasks, and people as a connected execution map."
   }
 ];
 
