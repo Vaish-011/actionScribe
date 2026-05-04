@@ -17,10 +17,7 @@ const {
   buildTaskFilter
 } = require("../services/accessScopeService");
 
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, "uploads/"),
-  filename: (req, file, cb) => cb(null, `${Date.now()}-${file.originalname.replace(/\s+/g, "_")}`)
-});
+const storage = multer.memoryStorage();
 
 const allowedMimeTypes = new Set([
   "text/plain",
@@ -76,6 +73,12 @@ const createTasksFromAi = async ({ tasks, meetingId, organization }) => {
     created.push(savedTask);
   }
   return created;
+};
+
+const cleanupUploadedFile = (filePath) => {
+  if (filePath && fs.existsSync(filePath)) {
+    fs.unlinkSync(filePath);
+  }
 };
 
 const runAiMeetingPipeline = async (transcript) => {
@@ -146,11 +149,25 @@ exports.uploadMeetingFile = async (req, res) => {
       return res.status(400).json({ error: "User must belong to an organization" });
     }
 
-    const isAudio = req.file.mimetype.startsWith("audio/");
-    const isPlainText = req.file.mimetype === "text/plain";
+    const mimetype = req.file.mimetype || "";
+    const fileExt = path.extname(req.file.originalname || "").toLowerCase();
+    const isWhitelistedMpeg = mimetype === "video/mpeg" && [".mpeg", ".mpg"].includes(fileExt);
+    const isAudio = mimetype.startsWith("audio/") || isWhitelistedMpeg;
+    const isPlainText = mimetype === "text/plain" || fileExt === ".txt";
+
+    if (mimetype.startsWith("video/") && !isWhitelistedMpeg) {
+      return res.status(400).json({
+        error: "Video files are not processed yet. Upload an audio file (MP3, WAV, M4A, or WhatsApp .mpeg audio) or a .txt transcript instead."
+      });
+    }
 
     if (isAudio) {
-      const transcript = await transcribeAudio(req.file.path);
+      const audioFile = new File(
+        [req.file.buffer],
+        req.file.originalname,
+        { type: mimetype || "application/octet-stream" }
+      );
+      const transcript = await transcribeAudio(audioFile);
       const aiOutput = await runAiMeetingPipeline(transcript);
 
       const meeting = await Meeting.create({
@@ -161,7 +178,7 @@ exports.uploadMeetingFile = async (req, res) => {
         topics: aiOutput.topics,
         organization: user.organization,
         createdBy: req.userId,
-        audioFile: req.file.path
+        audioFile: null
       });
 
       const createdTasks = await createTasksFromAi({
@@ -189,10 +206,6 @@ exports.uploadMeetingFile = async (req, res) => {
         audioFile: null
       });
 
-      if (fs.existsSync(req.file.path)) {
-        fs.unlinkSync(req.file.path);
-      }
-
       return res.status(202).json({
         message: "Document uploaded. Text extraction is not configured yet, so no tasks were extracted.",
         meeting,
@@ -200,7 +213,7 @@ exports.uploadMeetingFile = async (req, res) => {
       });
     }
 
-    const rawText = fs.readFileSync(req.file.path, "utf8");
+    const rawText = req.file.buffer.toString("utf8");
     const aiOutput = await runAiMeetingPipeline(rawText);
 
     const meeting = await Meeting.create({
@@ -231,7 +244,9 @@ exports.uploadMeetingFile = async (req, res) => {
       tasks: createdTasks
     });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    const message = error?.message || "Internal server error";
+    const statusCode = /unsupported|invalid|failed to fetch|transcription/i.test(message) ? 400 : 500;
+    return res.status(statusCode).json({ error: message });
   }
 };
 

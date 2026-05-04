@@ -124,12 +124,17 @@ exports.answerMeetingQuestion = async ({ transcript, summary, question }) => {
   });
 };
 
-exports.transcribeAudio = async (audioFilePath) => {
+exports.transcribeAudio = async (audioInput) => {
   if (!process.env.GROQ_API_KEY) {
     throw new Error("GROQ_API_KEY is missing. Configure it to enable audio transcription.");
   }
 
-  const fileStream = fs.createReadStream(audioFilePath);
+  let fileStream = audioInput;
+
+  if (typeof audioInput === "string") {
+    fileStream = fs.createReadStream(audioInput);
+  }
+
   const transcription = await groq.audio.transcriptions.create({
     file: fileStream,
     model: "whisper-large-v3-turbo"

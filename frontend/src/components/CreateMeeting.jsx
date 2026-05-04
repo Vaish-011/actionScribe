@@ -8,6 +8,7 @@ function CreateMeeting({ refresh }) {
   const [transcript, setTranscript] = useState("");
   const [file, setFile] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [lastResult, setLastResult] = useState(null);
 
   const submitMeeting = async () => {
 
@@ -19,19 +20,33 @@ function CreateMeeting({ refresh }) {
     try {
 
       setLoading(true);
+      setLastResult(null);
+
+      if (file) {
+        const fileName = file.name.toLowerCase();
+        const fileExt = fileName.includes(".") ? fileName.slice(fileName.lastIndexOf(".")) : "";
+        const isVideo = file.type.startsWith("video/") && ![".mpeg", ".mpg"].includes(fileExt);
+
+        if (isVideo) {
+          toast.error("Video files are not processed yet. Upload MP3, WAV, M4A, WhatsApp .mpeg audio, or a .txt transcript.");
+          return;
+        }
+      }
 
       if (file) {
         const formData = new FormData();
         formData.append("title", title || file.name);
         formData.append("file", file);
-        await API.post("/meetings/upload", formData, {
+        const response = await API.post("/meetings/upload", formData, {
           headers: { "Content-Type": "multipart/form-data" }
         });
+        setLastResult(response.data || null);
       } else {
-        await API.post("/meetings/create", {
+        const response = await API.post("/meetings/create", {
           title,
           transcript
         });
+        setLastResult(response.data || null);
       }
 
       toast.success("AI summary generated successfully!");
@@ -44,7 +59,7 @@ function CreateMeeting({ refresh }) {
 
     } catch (error) {
 
-      toast.error("Something went wrong");
+      toast.error(error?.response?.data?.error || error?.message || "Something went wrong");
 
     } finally {
 
@@ -85,7 +100,7 @@ function CreateMeeting({ refresh }) {
       <input
         type="file"
         className="w-full mb-3 text-sm"
-        accept=".txt,.pdf,.docx,.mp3,.wav"
+        accept=".txt,.pdf,.docx,.mp3,.wav,.m4a,.mpeg,.mpg"
         onChange={(e) => setFile(e.target.files?.[0] || null)}
       />
 
@@ -96,6 +111,33 @@ function CreateMeeting({ refresh }) {
       >
         {loading ? "Processing Meeting..." : "Process Meeting"}
       </button>
+
+      {lastResult?.meeting && (
+        <div className="mt-4 rounded-lg border border-gray-200 dark:border-gray-700 bg-slate-50 dark:bg-gray-700 p-4 space-y-3">
+          <div>
+            <h3 className="font-semibold dark:text-white">Latest Summary</h3>
+            <p className="text-sm text-gray-700 dark:text-gray-100 whitespace-pre-wrap">
+              {lastResult.meeting.summary || "No summary available"}
+            </p>
+          </div>
+
+          <div>
+            <h3 className="font-semibold dark:text-white">Extracted Tasks</h3>
+            {lastResult.tasks?.length ? (
+              <ul className="mt-2 space-y-2 text-sm text-gray-700 dark:text-gray-100">
+                {lastResult.tasks.map((task) => (
+                  <li key={task._id || task.title} className="rounded-md bg-white/70 dark:bg-gray-800/60 p-2">
+                    <p className="font-medium">{task.title}</p>
+                    <p>Owner: {task.owner || "Unassigned"}</p>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-sm text-gray-500">No tasks extracted.</p>
+            )}
+          </div>
+        </div>
+      )}
 
     </div>
   );

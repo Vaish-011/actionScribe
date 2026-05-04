@@ -6,7 +6,6 @@ const navItems = [
   { label: "Meetings", path: "/meetings" },
   { label: "Insights", path: "/insights" },
   { label: "Calendar", path: "/calendar" },
-  { label: "Admin", path: "/admin" }
 ];
 
 function Navbar() {
