@@ -5,6 +5,8 @@ const helmet = require("helmet");
 const compression = require("compression");
 const morgan = require("morgan");
 const rateLimit = require("express-rate-limit");
+const fs = require("fs");
+const path = require("path");
 require("dotenv").config();
 
 const app = express();
@@ -16,6 +18,8 @@ const organizationRoutes = require("./routes/organizationRoutes");
 const decisionRoutes = require("./routes/decisionRoutes");
 const analyticsRoutes = require("./routes/analyticsRoutes");
 const aiFeaturesRoutes = require("./routes/aiFeaturesRoutes");
+const frontendDistPath = path.join(__dirname, "..", "frontend", "dist");
+const frontendIndexPath = path.join(frontendDistPath, "index.html");
 
 const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -40,9 +44,21 @@ app.use("/api/organizations", organizationRoutes);
 app.use("/api/decisions", decisionRoutes);
 app.use("/api/analytics", analyticsRoutes);
 app.use("/api/ai", aiFeaturesRoutes);
+if (fs.existsSync(frontendDistPath)) {
+  app.use(express.static(frontendDistPath));
+}
 app.get("/", (req, res) => {
+  if (fs.existsSync(frontendIndexPath)) {
+    return res.sendFile(frontendIndexPath);
+  }
+
   res.send("AI Meeting Tracker API Running");
 });
+if (fs.existsSync(frontendIndexPath)) {
+  app.get(/^\/(?!api\/|uploads\/).*/, (req, res) => {
+    res.sendFile(frontendIndexPath);
+  });
+}
 
 mongoose.connect(process.env.MONGO_URI)
 .then(() => {
