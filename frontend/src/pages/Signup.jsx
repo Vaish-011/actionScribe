@@ -40,13 +40,15 @@ function Signup() {
 
   return (
 
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-green-100 to-blue-200 dark:from-gray-900 dark:to-black relative">
+    <div className="min-h-screen flex items-start sm:items-center justify-center bg-gradient-to-br from-green-100 to-blue-200 dark:from-gray-900 dark:to-black relative px-4 py-8">
 
-      <ThemeToggle />
+      <div className="absolute top-4 right-4 sm:top-6 sm:right-6">
+        <ThemeToggle />
+      </div>
 
-      <div className="bg-white dark:bg-gray-800 w-[380px] p-8 rounded-2xl shadow-2xl">
+      <div className="bg-white dark:bg-gray-800 w-full max-w-md p-6 sm:p-8 rounded-2xl shadow-2xl mt-10 sm:mt-0">
 
-        <h1 className="text-3xl font-bold text-center text-gray-800 dark:text-white mb-2">
+        <h1 className="text-2xl sm:text-3xl font-bold text-center text-gray-800 dark:text-white mb-2">
           Create Account
         </h1>
 

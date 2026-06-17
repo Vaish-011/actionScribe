@@ -106,7 +106,7 @@ function KnowledgeGraph() {
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <input
-              className="rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 dark:text-white px-3 py-2 text-sm min-w-[260px]"
+              className="w-full sm:w-auto rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 dark:text-white px-3 py-2 text-sm min-w-0 sm:min-w-[260px]"
               placeholder="Filter graph by keyword"
               value={query}
               onChange={(e) => setQuery(e.target.value)}

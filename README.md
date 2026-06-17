@@ -8,9 +8,11 @@ ActionScribe is an AI-powered execution intelligence platform that transforms me
 
 ## Live Platform
 
-**Frontend (User Interface):** [https://actionscribe.onrender.com](https://action-scribe.vercel.app/)
+**Frontend (User Interface):** [https://action-scribe.vercel.app/](https://action-scribe.vercel.app/)
 
 **Backend API:** [https://actionscribe.onrender.com/api](https://actionscribe.onrender.com)
+
+If you redeploy the frontend, make sure `VITE_API_BASE_URL` is set to the backend API URL above. The frontend falls back to this production URL when the variable is missing, and only uses `http://localhost:5000/api` during local development.
 
 **Database:** MongoDB Atlas (Cloud)
 

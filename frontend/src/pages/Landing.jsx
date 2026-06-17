@@ -35,16 +35,16 @@ const features = [
 function Landing() {
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-50 via-sky-50 to-indigo-100 dark:from-gray-900 dark:via-gray-900 dark:to-gray-800">
-      <header className="max-w-7xl mx-auto px-4 md:px-6 py-5 flex items-center justify-between">
+      <header className="max-w-7xl mx-auto px-4 md:px-6 py-5 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-xl md:text-2xl font-bold text-gray-900 dark:text-white">ActionScribe AI</h1>
           <p className="text-sm text-gray-500 dark:text-gray-300">AI Meeting to Action Tracker</p>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-row flex-wrap items-center justify-start sm:justify-end gap-2 w-full sm:w-auto">
           <ThemeToggle />
-          <Link to="/login" className="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium">Login</Link>
-          <Link to="/signup" className="px-4 py-2 rounded-lg bg-white text-indigo-700 border border-indigo-200 hover:bg-indigo-50 text-sm font-medium">Create Account</Link>
+          <Link to="/login" className="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium text-center w-full sm:w-auto">Login</Link>
+          <Link to="/signup" className="px-4 py-2 rounded-lg bg-white text-indigo-700 border border-indigo-200 hover:bg-indigo-50 text-sm font-medium text-center w-full sm:w-auto">Create Account</Link>
         </div>
       </header>
 
@@ -54,7 +54,7 @@ function Landing() {
             <span className="inline-block text-xs uppercase tracking-[0.2em] text-indigo-700 dark:text-indigo-300 bg-indigo-100 dark:bg-indigo-900/40 px-3 py-1 rounded-full">
               Full SaaS Workflow
             </span>
-            <h2 className="mt-4 text-4xl md:text-5xl font-extrabold text-gray-900 dark:text-white leading-tight">
+            <h2 className="mt-4 text-3xl sm:text-4xl md:text-5xl font-extrabold text-gray-900 dark:text-white leading-tight">
               Turn Every Meeting Into
               <span className="text-indigo-600 dark:text-indigo-400"> Executed Work</span>
             </h2>
@@ -62,9 +62,9 @@ function Landing() {
               ActionScribe helps teams summarize discussions, extract actionable tasks, monitor ownership, and close execution gaps.
             </p>
 
-            <div className="mt-6 flex flex-wrap gap-3">
-              <Link to="/signup" className="px-5 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-medium">Get Started Free</Link>
-              <Link to="/login" className="px-5 py-3 rounded-xl bg-white border border-gray-200 hover:bg-gray-50 text-gray-800 font-medium">Open Workspace</Link>
+            <div className="mt-6 flex flex-col sm:flex-row flex-wrap gap-3">
+              <Link to="/signup" className="px-5 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-center">Get Started Free</Link>
+              <Link to="/login" className="px-5 py-3 rounded-xl bg-white border border-gray-200 hover:bg-gray-50 text-gray-800 font-medium text-center">Open Workspace</Link>
             </div>
           </div>
 
