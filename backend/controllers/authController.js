@@ -30,7 +30,7 @@ exports.signup = async (req, res) => {
       return res.status(400).json({ message: "Name, email and password are required" });
     }
 
-    const existingUser = await User.findOne({ email });
+    const existingUser = await User.findOne({ email }).select("_id");
     if (existingUser) {
       return res.status(400).json({ message: "User already exists" });
     }
@@ -57,7 +57,7 @@ exports.signup = async (req, res) => {
 exports.login = async (req, res) => {
   try {
     const { email, password } = req.body;
-    const user = await User.findOne({ email });
+    const user = await User.findOne({ email }).select("name email password role organization");
 
     if (!user) {
       return res.status(400).json({ message: "Invalid email or password" });
@@ -72,7 +72,9 @@ exports.login = async (req, res) => {
       return res.status(400).json({ message: "Invalid email or password" });
     }
 
-    await ensureUserOrganization(user);
+    if (!user.organization) {
+      ensureUserOrganization(user).catch(() => null);
+    }
 
     res.json(buildTokenAndUserResponse(user));
   } catch (error) {
