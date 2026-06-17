@@ -31,9 +31,11 @@ function ThemeToggle() {
   return (
     <button
       onClick={toggleTheme}
-      className="px-3 py-1 bg-gray-200 dark:bg-gray-700 text-black dark:text-white rounded"
+      aria-label="Toggle light and dark theme"
+      className="inline-flex items-center justify-center gap-2 rounded-full border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 shadow-sm transition hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:hover:bg-gray-700"
     >
-      {dark ? "☀️ Light" : "🌙 Dark"}
+      <span className="text-base leading-none">{dark ? "☀" : "☾"}</span>
+      <span className="hidden sm:inline">{dark ? "Light" : "Dark"}</span>
     </button>
   );
 }
